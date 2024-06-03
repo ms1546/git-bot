@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -15,7 +14,7 @@ import (
 func main() {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv("GITHUB_TOKEN")},
+		&oauth2.Token{AccessToken: os.Getenv("GH_TOKEN")},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
@@ -27,7 +26,7 @@ func main() {
 		log.Fatalf("Error creating LINE bot client: %v", err)
 	}
 
-	username := os.Getenv("GITHUB_USERNAME")
+	username := os.Getenv("GH_USERNAME")
 
 	today := time.Now().Format("2006-01-02")
 
@@ -45,16 +44,18 @@ func main() {
 	}
 
 	if !grassExists {
-		message := fmt.Sprintf("今日はまだGitHubに草が生えていません。頑張ってください！")
-		if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(message)).Do(); err != nil {
-			log.Fatalf("Error sending message to LINE: %v", err)
+		if !grassExists {
+			message := "今日はまだGitHubに草が生えていませんw"
+			if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(message)).Do(); err != nil {
+				log.Fatalf("Error sending message to LINE: %v", err)
+			}
 		}
 	}
 
 	if time.Now().Hour() == 23 && time.Now().Minute() >= 59 {
-		finalMessage := "今日のGitHubのコントリビューションはありませんでした。"
+		finalMessage := "今日のGitHubのコントリビューションはありませんでした"
 		if grassExists {
-			finalMessage = "今日のGitHubのコントリビューションがありました！お疲れ様です。"
+			finalMessage = "今日のGitHubのコントリビューションがありましたwww"
 		}
 		if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(finalMessage)).Do(); err != nil {
 			log.Fatalf("Error sending message to LINE: %v", err)

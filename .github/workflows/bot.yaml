@@ -24,8 +24,8 @@ jobs:
 
     - name: Run notification script
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_USERNAME: ${{ secrets.GITHUB_USERNAME }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GH_USERNAME: ${{ secrets.GH_USERNAME }}
         LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
         LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
         LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
