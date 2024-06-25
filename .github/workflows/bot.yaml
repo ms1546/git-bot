@@ -2,9 +2,9 @@ name: Notify GitHub Contribution
 
 on:
   schedule:
-    - cron: '0 21 * * *'
-    - cron: '0 23 * * *'
-    - cron: '59 23 * * *'
+    - cron: '0 12 * * *'  # 21:00 JST
+    - cron: '0 14 * * *'  # 23:00 JST
+    - cron: '59 14 * * *' # 23:59 JST
 
 jobs:
   notify:
