@@ -36,19 +36,43 @@ func main() {
 	}
 
 	var grassExists bool
+	var latestEvent *github.Event
 	for _, event := range events {
 		if event.CreatedAt.Format("2006-01-02") == today {
 			grassExists = true
+			latestEvent = event
 			break
 		}
 	}
 
 	if !grassExists {
-		if !grassExists {
-			message := "今日はまだGitHubに草が生えていませんw"
-			if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(message)).Do(); err != nil {
-				log.Fatalf("Error sending message to LINE: %v", err)
+		message := "今日はまだGitHubに草が生えていませんw"
+		if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(message)).Do(); err != nil {
+			log.Fatalf("Error sending message to LINE: %v", err)
+		}
+	} else if latestEvent != nil {
+		// 更新があった場合の通知
+		message := "更新がありました！\n"
+		message += "イベントの種類: " + latestEvent.GetType() + "\n"
+		message += "リポジトリ: " + latestEvent.GetRepo().GetName() + "\n"
+
+		switch latestEvent.GetType() {
+		case "PushEvent":
+			pushEventPayload, payloadErr := latestEvent.ParsePayload()
+			if payloadErr != nil {
+				log.Fatalf("Error parsing payload: %v", payloadErr)
 			}
+			pushEvent, ok := pushEventPayload.(*github.PushEvent)
+			if !ok {
+				log.Fatalf("Error casting to push event")
+			}
+			message += "詳細: " + pushEvent.GetHead()
+		default:
+			message += "詳細: イベントの詳細は対応していません。"
+		}
+
+		if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(message)).Do(); err != nil {
+			log.Fatalf("Error sending message to LINE: %v", err)
 		}
 	}
 
