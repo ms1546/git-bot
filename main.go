@@ -27,18 +27,21 @@ func main() {
 	}
 
 	username := os.Getenv("GH_USERNAME")
-
 	today := time.Now().Format("2006-01-02")
 
 	events, _, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, nil)
 	if err != nil {
 		log.Fatalf("Error fetching events: %v", err)
 	}
+	if len(events) == 0 {
+		log.Println("No events fetched for today.")
+	}
 
 	var grassExists bool
 	var latestEvent *github.Event
 	for _, event := range events {
-		if event.CreatedAt.Format("2006-01-02") == today {
+		eventDate := event.GetCreatedAt().Format("2006-01-02")
+		if eventDate == today {
 			grassExists = true
 			latestEvent = event
 			break
@@ -51,7 +54,6 @@ func main() {
 			log.Fatalf("Error sending message to LINE: %v", err)
 		}
 	} else if latestEvent != nil {
-		// 更新があった場合の通知
 		message := "更新がありました！\n"
 		message += "イベントの種類: " + latestEvent.GetType() + "\n"
 		message += "リポジトリ: " + latestEvent.GetRepo().GetName() + "\n"
