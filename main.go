@@ -11,6 +11,21 @@ import (
 	"golang.org/x/oauth2"
 )
 
+func getGithubEvents(ctx context.Context, client *github.Client, username string) ([]*github.Event, error) {
+	events, _, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, nil)
+	if err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+func sendLineMessage(bot *linebot.Client, userID, message string) error {
+	if _, err := bot.PushMessage(userID, linebot.NewTextMessage(message)).Do(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
@@ -29,7 +44,7 @@ func main() {
 	username := os.Getenv("GH_USERNAME")
 	today := time.Now().Format("2006-01-02")
 
-	events, _, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, nil)
+	events, err := getGithubEvents(ctx, client, username)
 	if err != nil {
 		log.Fatalf("Error fetching events: %v", err)
 	}
@@ -50,7 +65,7 @@ func main() {
 
 	if !grassExists {
 		message := "今日はまだGitHubに草が生えていませんw"
-		if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(message)).Do(); err != nil {
+		if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), message); err != nil {
 			log.Fatalf("Error sending message to LINE: %v", err)
 		}
 	} else if latestEvent != nil {
@@ -73,7 +88,7 @@ func main() {
 			message += "詳細: イベントの詳細は対応していません。"
 		}
 
-		if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(message)).Do(); err != nil {
+		if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), message); err != nil {
 			log.Fatalf("Error sending message to LINE: %v", err)
 		}
 	}
@@ -83,7 +98,7 @@ func main() {
 		if grassExists {
 			finalMessage = "今日のGitHubのコントリビューションがありましたwww"
 		}
-		if _, err := bot.PushMessage(os.Getenv("LINE_USER_ID"), linebot.NewTextMessage(finalMessage)).Do(); err != nil {
+		if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), finalMessage); err != nil {
 			log.Fatalf("Error sending message to LINE: %v", err)
 		}
 	}
