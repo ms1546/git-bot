@@ -11,12 +11,26 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func getGithubEvents(ctx context.Context, client *github.Client, username string) ([]*github.Event, error) {
-	events, _, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, nil)
-	if err != nil {
-		return nil, err
+func getGithubEvents(ctx context.Context, client *github.Client, username string, date string) ([]*github.Event, error) {
+	opts := &github.ListOptions{}
+	var allEvents []*github.Event
+	for {
+		events, resp, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, event := range events {
+			eventDate := event.GetCreatedAt().Format("2006-01-02")
+			if eventDate == date {
+				allEvents = append(allEvents, event)
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
-	return events, nil
+	return allEvents, nil
 }
 
 func sendLineMessage(bot *linebot.Client, userID, message string) error {
@@ -42,64 +56,39 @@ func main() {
 	}
 
 	username := os.Getenv("GH_USERNAME")
-	today := time.Now().Format("2006-01-02")
 
-	events, err := getGithubEvents(ctx, client, username)
+	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	events, err := getGithubEvents(ctx, client, username, yesterday)
 	if err != nil {
 		log.Fatalf("Error fetching events: %v", err)
 	}
+
+	var message string
 	if len(events) == 0 {
-		log.Println("No events fetched for today.")
-	}
-
-	var grassExists bool
-	var latestEvent *github.Event
-	for _, event := range events {
-		eventDate := event.GetCreatedAt().Format("2006-01-02")
-		if eventDate == today {
-			grassExists = true
-			latestEvent = event
-			break
-		}
-	}
-
-	if !grassExists {
-		message := "今日はまだGitHubに草が生えていませんw"
-		if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), message); err != nil {
-			log.Fatalf("Error sending message to LINE: %v", err)
-		}
-	} else if latestEvent != nil {
-		message := "更新がありました！\n"
-		message += "イベントの種類: " + latestEvent.GetType() + "\n"
-		message += "リポジトリ: " + latestEvent.GetRepo().GetName() + "\n"
-
-		switch latestEvent.GetType() {
-		case "PushEvent":
-			pushEventPayload, payloadErr := latestEvent.ParsePayload()
-			if payloadErr != nil {
-				log.Fatalf("Error parsing payload: %v", payloadErr)
+		message = "昨日はGitHubに草が生えていませんでした。"
+	} else {
+		message = "昨日のGitHubイベント:\n"
+		for _, event := range events {
+			message += "イベントの種類: " + event.GetType() + "\n"
+			message += "リポジトリ: " + event.GetRepo().GetName() + "\n"
+			switch event.GetType() {
+			case "PushEvent":
+				pushEventPayload, payloadErr := event.ParsePayload()
+				if payloadErr != nil {
+					log.Fatalf("Error parsing payload: %v", payloadErr)
+				}
+				pushEvent, ok := pushEventPayload.(*github.PushEvent)
+				if !ok {
+					log.Fatalf("Error casting to push event")
+				}
+				message += "詳細: " + pushEvent.GetHead() + "\n"
+			default:
+				message += "詳細: イベントの詳細は対応していません。\n"
 			}
-			pushEvent, ok := pushEventPayload.(*github.PushEvent)
-			if !ok {
-				log.Fatalf("Error casting to push event")
-			}
-			message += "詳細: " + pushEvent.GetHead()
-		default:
-			message += "詳細: イベントの詳細は対応していません。"
-		}
-
-		if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), message); err != nil {
-			log.Fatalf("Error sending message to LINE: %v", err)
 		}
 	}
 
-	if time.Now().Hour() == 23 && time.Now().Minute() >= 59 {
-		finalMessage := "今日のGitHubのコントリビューションはありませんでした"
-		if grassExists {
-			finalMessage = "今日のGitHubのコントリビューションがありましたwww"
-		}
-		if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), finalMessage); err != nil {
-			log.Fatalf("Error sending message to LINE: %v", err)
-		}
+	if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), message); err != nil {
+		log.Fatalf("Error sending message to LINE: %v", err)
 	}
 }
