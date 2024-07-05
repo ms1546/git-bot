@@ -11,17 +11,27 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func getGithubEvents(ctx context.Context, client *github.Client, username string, date string) ([]*github.Event, error) {
+func createGithubClient(ctx context.Context, token string) *github.Client {
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	tc := oauth2.NewClient(ctx, ts)
+	return github.NewClient(tc)
+}
+
+func createLineBotClient(secret, token string) (*linebot.Client, error) {
+	return linebot.New(secret, token)
+}
+
+func getGithubEvents(ctx context.Context, client *github.Client, username, date string) ([]*github.Event, error) {
 	opts := &github.ListOptions{}
 	var allEvents []*github.Event
+
 	for {
 		events, resp, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, event := range events {
-			eventDate := event.GetCreatedAt().Format("2006-01-02")
-			if eventDate == date {
+			if event.GetCreatedAt().Format("2006-01-02") == date {
 				allEvents = append(allEvents, event)
 			}
 		}
@@ -33,62 +43,59 @@ func getGithubEvents(ctx context.Context, client *github.Client, username string
 	return allEvents, nil
 }
 
-func sendLineMessage(bot *linebot.Client, userID, message string) error {
-	if _, err := bot.PushMessage(userID, linebot.NewTextMessage(message)).Do(); err != nil {
-		return err
+func buildMessage(events []*github.Event) string {
+	if len(events) == 0 {
+		return "昨日はGitHubに草が生えていませんでした。"
 	}
-	return nil
+
+	message := "昨日のGitHubイベント:\n"
+	for _, event := range events {
+		message += "イベントの種類: " + event.GetType() + "\n"
+		message += "リポジトリ: " + event.GetRepo().GetName() + "\n"
+		if event.GetType() == "PushEvent" {
+			payload, err := event.ParsePayload()
+			if err == nil {
+				if pushEvent, ok := payload.(*github.PushEvent); ok {
+					message += "詳細: " + pushEvent.GetHead() + "\n"
+				}
+			}
+		} else {
+			message += "詳細: イベントの詳細は対応していません。\n"
+		}
+	}
+	return message
+}
+
+func sendLineMessage(bot *linebot.Client, userID, message string) error {
+	_, err := bot.PushMessage(userID, linebot.NewTextMessage(message)).Do()
+	return err
 }
 
 func main() {
 	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv("GH_TOKEN")},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
 
+	githubToken := os.Getenv("GH_TOKEN")
+	githubUsername := os.Getenv("GH_USERNAME")
 	lineChannelSecret := os.Getenv("LINE_CHANNEL_SECRET")
 	lineChannelToken := os.Getenv("LINE_CHANNEL_TOKEN")
-	bot, err := linebot.New(lineChannelSecret, lineChannelToken)
+	lineUserID := os.Getenv("LINE_USER_ID")
+
+	client := createGithubClient(ctx, githubToken)
+
+	bot, err := createLineBotClient(lineChannelSecret, lineChannelToken)
 	if err != nil {
 		log.Fatalf("Error creating LINE bot client: %v", err)
 	}
 
-	username := os.Getenv("GH_USERNAME")
-
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	events, err := getGithubEvents(ctx, client, username, yesterday)
+	events, err := getGithubEvents(ctx, client, githubUsername, yesterday)
 	if err != nil {
 		log.Fatalf("Error fetching events: %v", err)
 	}
 
-	var message string
-	if len(events) == 0 {
-		message = "昨日はGitHubに草が生えていませんでした。"
-	} else {
-		message = "昨日のGitHubイベント:\n"
-		for _, event := range events {
-			message += "イベントの種類: " + event.GetType() + "\n"
-			message += "リポジトリ: " + event.GetRepo().GetName() + "\n"
-			switch event.GetType() {
-			case "PushEvent":
-				pushEventPayload, payloadErr := event.ParsePayload()
-				if payloadErr != nil {
-					log.Fatalf("Error parsing payload: %v", payloadErr)
-				}
-				pushEvent, ok := pushEventPayload.(*github.PushEvent)
-				if !ok {
-					log.Fatalf("Error casting to push event")
-				}
-				message += "詳細: " + pushEvent.GetHead() + "\n"
-			default:
-				message += "詳細: イベントの詳細は対応していません。\n"
-			}
-		}
-	}
+	message := buildMessage(events)
 
-	if err := sendLineMessage(bot, os.Getenv("LINE_USER_ID"), message); err != nil {
+	if err := sendLineMessage(bot, lineUserID, message); err != nil {
 		log.Fatalf("Error sending message to LINE: %v", err)
 	}
 }
