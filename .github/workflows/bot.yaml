@@ -14,25 +14,43 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Clear Go cache
-      run: |
-        rm -rf ~/go/pkg/mod
-        rm -rf ~/go/bin
-        rm -rf ~/.cache/go-build
-
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: '1.21'
+        go-version: '1.21.6'
 
     - name: Install dependencies
       run: go mod tidy
 
-    - name: Run notification script
+    - name: Run notification script at 21:00
+      if: github.event.schedule == '0 12 * * *'
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
         GH_USERNAME: ${{ secrets.GH_USERNAME }}
         LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
         LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
         LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        IS_FINAL_CHECK: 'false'
+      run: go run main.go
+
+    - name: Run notification script at 23:00
+      if: github.event.schedule == '0 14 * * *'
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GH_USERNAME: ${{ secrets.GH_USERNAME }}
+        LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+        LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+        LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        IS_FINAL_CHECK: 'false'
+      run: go run main.go
+
+    - name: Run notification script at 23:59
+      if: github.event.schedule == '59 14 * * *'
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        GH_USERNAME: ${{ secrets.GH_USERNAME }}
+        LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+        LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+        LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        IS_FINAL_CHECK: 'true'
       run: go run main.go

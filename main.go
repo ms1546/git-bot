@@ -43,12 +43,15 @@ func getGithubEvents(ctx context.Context, client *github.Client, username, date 
 	return allEvents, nil
 }
 
-func buildMessage(events []*github.Event) string {
+func buildMessage(events []*github.Event, isFinalCheck bool) string {
 	if len(events) == 0 {
-		return "昨日はGitHubに草が生えていませんでした。"
+		if isFinalCheck {
+			return "本日はGitHubに草が生えませんでした。"
+		}
+		return "まだ本日はGitHubに草が生えていません。"
 	}
 
-	message := "昨日のGitHubイベント:\n"
+	message := "本日のGitHubイベント:\n"
 	for _, event := range events {
 		message += "イベントの種類: " + event.GetType() + "\n"
 		message += "リポジトリ: " + event.GetRepo().GetName() + "\n"
@@ -79,23 +82,24 @@ func main() {
 	lineChannelSecret := os.Getenv("LINE_CHANNEL_SECRET")
 	lineChannelToken := os.Getenv("LINE_CHANNEL_TOKEN")
 	lineUserID := os.Getenv("LINE_USER_ID")
+	isFinalCheck := os.Getenv("IS_FINAL_CHECK") == "true"
 
 	client := createGithubClient(ctx, githubToken)
 
 	bot, err := createLineBotClient(lineChannelSecret, lineChannelToken)
 	if err != nil {
-		log.Fatalf("Error creating LINE bot client: %v", err)
+		log.Fatalf("LINEボットクライアントの作成中にエラーが発生しました: %v", err)
 	}
 
-	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	events, err := getGithubEvents(ctx, client, githubUsername, yesterday)
+	today := time.Now().Format("2006-01-02")
+	events, err := getGithubEvents(ctx, client, githubUsername, today)
 	if err != nil {
-		log.Fatalf("Error fetching events: %v", err)
+		log.Fatalf("イベントの取得中にエラーが発生しました: %v", err)
 	}
 
-	message := buildMessage(events)
+	message := buildMessage(events, isFinalCheck)
 
 	if err := sendLineMessage(bot, lineUserID, message); err != nil {
-		log.Fatalf("Error sending message to LINE: %v", err)
+		log.Fatalf("LINEへのメッセージ送信中にエラーが発生しました: %v", err)
 	}
 }
