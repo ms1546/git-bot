@@ -91,8 +91,13 @@ func main() {
 		log.Fatalf("LINEボットクライアントの作成中にエラーが発生しました: %v", err)
 	}
 
-	today := time.Now().Format("2006-01-02")
-	events, err := getGithubEvents(ctx, client, githubUsername, today)
+	today := time.Now()
+	if isFinalCheck {
+		today = today.AddDate(0, 0, -1)
+	}
+	dateString := today.Format("2006-01-02")
+
+	events, err := getGithubEvents(ctx, client, githubUsername, dateString)
 	if err != nil {
 		log.Fatalf("イベントの取得中にエラーが発生しました: %v", err)
 	}

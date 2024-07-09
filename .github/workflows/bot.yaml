@@ -2,13 +2,20 @@ name: Notify GitHub Contribution
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 21:00 JST
-    - cron: '0 14 * * *'  # 23:00 JST
-    - cron: '59 14 * * *' # 23:59 JST
+    - cron: '0 12 * * *' # 21:00 JST
+    - cron: '0 14 * * *' # 23:00 JST
+    - cron: '0 15 * * *' # 24:00 JST
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      GH_USERNAME: ${{ secrets.GH_USERNAME }}
+      LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+      LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+      LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
 
     steps:
     - name: Checkout repository
@@ -25,32 +32,17 @@ jobs:
     - name: Run notification script at 21:00
       if: github.event.schedule == '0 12 * * *'
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        GH_USERNAME: ${{ secrets.GH_USERNAME }}
-        LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-        LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-        LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         IS_FINAL_CHECK: 'false'
       run: go run main.go
 
     - name: Run notification script at 23:00
       if: github.event.schedule == '0 14 * * *'
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        GH_USERNAME: ${{ secrets.GH_USERNAME }}
-        LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-        LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-        LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         IS_FINAL_CHECK: 'false'
       run: go run main.go
 
-    - name: Run notification script at 23:59
-      if: github.event.schedule == '59 14 * * *'
+    - name: Run notification script at 00:00
+      if: github.event.schedule == '0 15 * * *'
       env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        GH_USERNAME: ${{ secrets.GH_USERNAME }}
-        LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
-        LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-        LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         IS_FINAL_CHECK: 'true'
       run: go run main.go
