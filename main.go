@@ -50,8 +50,9 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 		}
 		return "まだ本日はGitHubに草が生えていません。"
 	}
-
-	message := "本日のGitHubイベント:\n"
+	yesterday := time.Now().AddDate(0, 0, -1)
+	yesterdayString := yesterday.Format("2006-01-02")
+	message := yesterdayString + "のGitHubイベント:\n"
 	for _, event := range events {
 		message += "イベントの種類: " + event.GetType() + "\n"
 		message += "リポジトリ: " + event.GetRepo().GetName() + "\n"
