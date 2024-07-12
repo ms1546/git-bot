@@ -5,53 +5,76 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/google/go-github/v33/github"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 	"github.com/stretchr/testify/assert"
 )
 
-type MockGithubClient struct {
-	*gomock.Controller
-	mock *github.Client
+// GitHubClientInterface defines the methods used from the GitHub client
+type GitHubClientInterface interface {
+	ListEventsPerformedByUser(ctx context.Context, user string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error)
 }
 
-type MockLineBotClient struct {
-	*gomock.Controller
-	mock *linebot.Client
+type GitHubClientWrapper struct {
+	client *github.Client
+}
+
+func (g *GitHubClientWrapper) ListEventsPerformedByUser(ctx context.Context, user string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error) {
+	return g.client.Activity.ListEventsPerformedByUser(ctx, user, publicOnly, opt)
+}
+
+// LineBotClientInterface defines the methods used from the LINE bot client
+type LineBotClientInterface interface {
+	PushMessage(to string, messages ...linebot.SendingMessage) *linebot.PushMessageCall
+}
+
+// MockGitHubClient is a mock implementation of GitHubClientInterface
+type MockGitHubClient struct{}
+
+func (m *MockGitHubClient) ListEventsPerformedByUser(ctx context.Context, user string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error) {
+	timestamp := time.Now().AddDate(0, 0, -1)
+	return []*github.Event{
+		{
+			Type:      github.String("PushEvent"),
+			Repo:      &github.Repository{Name: github.String("mock/repo")},
+			CreatedAt: &github.Timestamp{Time: timestamp},
+		},
+	}, &github.Response{NextPage: 0}, nil
+}
+
+// MockLineBotClient is a mock implementation of LineBotClientInterface
+type MockLineBotClient struct{}
+
+func (m *MockLineBotClient) PushMessage(to string, messages ...linebot.SendingMessage) *linebot.PushMessageCall {
+	return &linebot.PushMessageCall{}
 }
 
 func TestGetGithubEvents(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockGithubClient := NewMockGithubClient(ctrl)
+	client := &MockGitHubClient{}
 	ctx := context.Background()
-	username := "testuser"
 
-	mockEvents := []*github.Event{
+	events, err := getGithubEvents(ctx, client, "mockUser", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
+	assert.NoError(t, err)
+	assert.NotEmpty(t, events)
+}
+
+func TestBuildMessage(t *testing.T) {
+	timestamp := time.Now().AddDate(0, 0, -1)
+	createdAt := github.Timestamp{Time: timestamp}
+	events := []*github.Event{
 		{
-			CreatedAt: &github.Timestamp{Time: time.Now()},
+			Type:      github.String("PushEvent"),
+			Repo:      &github.Repository{Name: github.String("mock/repo")},
+			CreatedAt: &createdAt,
 		},
 	}
 
-	mockGithubClient.EXPECT().Activity.ListEventsPerformedByUser(ctx, username, false, nil).Return(mockEvents, nil, nil)
-
-	events, err := getGithubEvents(ctx, mockGithubClient.mock, username)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(events))
+	message := buildMessage(events, false)
+	assert.Contains(t, message, "mock/repo")
 }
 
 func TestSendLineMessage(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockLineBotClient := NewMockLineBotClient(ctrl)
-	userID := "testuserid"
-	message := "test message"
-
-	mockLineBotClient.EXPECT().PushMessage(userID, linebot.NewTextMessage(message)).Return(&linebot.BasicResponse{}, nil)
-
-	err := sendLineMessage(mockLineBotClient.mock, userID, message)
+	client := &MockLineBotClient{}
+	err := sendLineMessage(client, "mockUserID", "test message")
 	assert.NoError(t, err)
 }
