@@ -11,6 +11,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type GitHubClientInterface interface {
+	ListEventsPerformedByUser(ctx context.Context, user string, includeUser bool, opts *github.ListOptions) ([]*github.Event, *github.Response, error)
+}
+
+type GitHubClientWrapper struct {
+	client *github.Client
+}
+
+func (w *GitHubClientWrapper) ListEventsPerformedByUser(ctx context.Context, user string, includeUser bool, opts *github.ListOptions) ([]*github.Event, *github.Response, error) {
+	return w.client.Activity.ListEventsPerformedByUser(ctx, user, includeUser, opts)
+}
+
+type LineBotClientInterface interface {
+	PushMessage(to string, messages ...linebot.SendingMessage) *linebot.BasicResponse
+}
+
 func createGithubClient(ctx context.Context, token string) GitHubClientInterface {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(ctx, ts)
