@@ -27,6 +27,14 @@ type LineBotClientInterface interface {
 	PushMessage(to string, messages ...linebot.SendingMessage) *linebot.BasicResponse
 }
 
+type LineBotClientWrapper struct {
+	client *linebot.Client
+}
+
+func (w *LineBotClientWrapper) PushMessage(to string, messages ...linebot.SendingMessage) *linebot.BasicResponse {
+	return w.client.PushMessage(to, messages...)
+}
+
 func createGithubClient(ctx context.Context, token string) GitHubClientInterface {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(ctx, ts)
@@ -35,7 +43,11 @@ func createGithubClient(ctx context.Context, token string) GitHubClientInterface
 }
 
 func createLineBotClient(secret, token string) (LineBotClientInterface, error) {
-	return linebot.New(secret, token)
+	client, err := linebot.New(secret, token)
+	if err != nil {
+		return nil, err
+	}
+	return &LineBotClientWrapper{client: client}, nil
 }
 
 func getGithubEvents(ctx context.Context, client GitHubClientInterface, username, date string) ([]*github.Event, error) {
