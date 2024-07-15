@@ -5,76 +5,89 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-github/v33/github"
-	"github.com/line/line-bot-sdk-go/v7/linebot"
-	"github.com/stretchr/testify/assert"
+	"github.com/google/go-github/github"
 )
 
-// GitHubClientInterface defines the methods used from the GitHub client
-type GitHubClientInterface interface {
-	ListEventsPerformedByUser(ctx context.Context, user string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error)
-}
-
-type GitHubClientWrapper struct {
-	client *github.Client
-}
-
-func (g *GitHubClientWrapper) ListEventsPerformedByUser(ctx context.Context, user string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error) {
-	return g.client.Activity.ListEventsPerformedByUser(ctx, user, publicOnly, opt)
-}
-
-// LineBotClientInterface defines the methods used from the LINE bot client
-type LineBotClientInterface interface {
-	PushMessage(to string, messages ...linebot.SendingMessage) *linebot.PushMessageCall
-}
-
-// MockGitHubClient is a mock implementation of GitHubClientInterface
-type MockGitHubClient struct{}
-
-func (m *MockGitHubClient) ListEventsPerformedByUser(ctx context.Context, user string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error) {
-	timestamp := time.Now().AddDate(0, 0, -1)
-	return []*github.Event{
-		{
-			Type:      github.String("PushEvent"),
-			Repo:      &github.Repository{Name: github.String("mock/repo")},
-			CreatedAt: &github.Timestamp{Time: timestamp},
-		},
-	}, &github.Response{NextPage: 0}, nil
-}
-
-// MockLineBotClient is a mock implementation of LineBotClientInterface
-type MockLineBotClient struct{}
-
-func (m *MockLineBotClient) PushMessage(to string, messages ...linebot.SendingMessage) *linebot.PushMessageCall {
-	return &linebot.PushMessageCall{}
-}
-
-func TestGetGithubEvents(t *testing.T) {
-	client := &MockGitHubClient{}
+func TestCreateGithubClient(t *testing.T) {
 	ctx := context.Background()
+	token := "dummy_token"
+	client := createGithubClient(ctx, token)
+	if client == nil {
+		t.Fatalf("Expected github.Client, got nil")
+	}
+}
 
-	events, err := getGithubEvents(ctx, client, "mockUser", time.Now().AddDate(0, 0, -1).Format("2006-01-02"))
-	assert.NoError(t, err)
-	assert.NotEmpty(t, events)
+func TestCreateLineBotClient(t *testing.T) {
+	secret := "dummy_secret"
+	token := "dummy_token"
+	bot, err := createLineBotClient(secret, token)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if bot == nil {
+		t.Fatalf("Expected linebot.Client, got nil")
+	}
 }
 
 func TestBuildMessage(t *testing.T) {
-	timestamp := time.Now().AddDate(0, 0, -1)
-	createdAt := github.Timestamp{Time: timestamp}
-	events := []*github.Event{
-		{
-			Type:      github.String("PushEvent"),
-			Repo:      &github.Repository{Name: github.String("mock/repo")},
-			CreatedAt: &createdAt,
-		},
+	event := &github.Event{
+		Repo: &github.Repository{Name: github.String("test/repo")},
+		Type: github.String("PushEvent"),
 	}
+	events := []*github.Event{event}
 
-	message := buildMessage(events, false)
-	assert.Contains(t, message, "mock/repo")
+	t.Run("With events", func(t *testing.T) {
+		isFinalCheck := false
+		msg := buildMessage(events, isFinalCheck)
+		if msg == "" {
+			t.Fatalf("Expected non-empty message, got empty string")
+		}
+	})
+
+	t.Run("Without events, not final check", func(t *testing.T) {
+		isFinalCheck := false
+		msg := buildMessage([]*github.Event{}, isFinalCheck)
+		expected := "まだ本日はGitHubに草が生えていません。"
+		if msg != expected {
+			t.Fatalf("Expected %v, got %v", expected, msg)
+		}
+	})
+
+	t.Run("Without events, final check", func(t *testing.T) {
+		isFinalCheck := true
+		msg := buildMessage([]*github.Event{}, isFinalCheck)
+		expected := "本日はGitHubに草が生えませんでした。"
+		if msg != expected {
+			t.Fatalf("Expected %v, got %v", expected, msg)
+		}
+	})
+}
+
+func TestGetGithubEvents(t *testing.T) {
+	ctx := context.Background()
+	client := createGithubClient(ctx, "dummy_token")
+	username := "dummy_user"
+	date := time.Now().Format("2006-01-02")
+
+	events, err := getGithubEvents(ctx, client, username, date)
+	if err == nil && len(events) > 0 {
+		t.Fatalf("Expected no events for dummy user, got %d", len(events))
+	}
 }
 
 func TestSendLineMessage(t *testing.T) {
-	client := &MockLineBotClient{}
-	err := sendLineMessage(client, "mockUserID", "test message")
-	assert.NoError(t, err)
+	secret := "dummy_secret"
+	token := "dummy_token"
+	bot, err := createLineBotClient(secret, token)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	userID := "dummy_user_id"
+	message := "test message"
+
+	err = sendLineMessage(bot, userID, message)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
 }

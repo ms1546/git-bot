@@ -11,23 +11,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func createGithubClient(ctx context.Context, token string) GitHubClientInterface {
+func createGithubClient(ctx context.Context, token string) *github.Client {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-	return &GitHubClientWrapper{client: client}
+	return github.NewClient(tc)
 }
 
-func createLineBotClient(secret, token string) (LineBotClientInterface, error) {
+func createLineBotClient(secret, token string) (*linebot.Client, error) {
 	return linebot.New(secret, token)
 }
 
-func getGithubEvents(ctx context.Context, client GitHubClientInterface, username, date string) ([]*github.Event, error) {
+func getGithubEvents(ctx context.Context, client *github.Client, username, date string) ([]*github.Event, error) {
 	opts := &github.ListOptions{}
 	var allEvents []*github.Event
 
 	for {
-		events, resp, err := client.ListEventsPerformedByUser(ctx, username, false, opts)
+		events, resp, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +69,7 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 	return message
 }
 
-func sendLineMessage(bot LineBotClientInterface, userID, message string) error {
+func sendLineMessage(bot *linebot.Client, userID, message string) error {
 	_, err := bot.PushMessage(userID, linebot.NewTextMessage(message)).Do()
 	return err
 }
