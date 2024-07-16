@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v33/github"
 )
 
 func TestCreateGithubClient(t *testing.T) {
