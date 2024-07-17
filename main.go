@@ -54,17 +54,7 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 	yesterdayString := yesterday.Format("2006-01-02")
 	message := yesterdayString + "の草:\n"
 	for _, event := range events {
-		message += "リポジトリ: " + event.GetRepo().GetName() + "\n"
-		if event.GetType() == "PushEvent" {
-			payload, err := event.ParsePayload()
-			if err == nil {
-				if pushEvent, ok := payload.(*github.PushEvent); ok {
-					message += "詳細: " + pushEvent.GetHead() + "\n"
-				}
-			}
-		} else {
-			message += "詳細: イベントの詳細は対応していません。\n"
-		}
+		message += "\nリポジトリ: " + event.GetRepo().GetName()
 	}
 	return message
 }
