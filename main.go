@@ -54,7 +54,7 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 	yesterdayString := yesterday.Format("2006-01-02")
 	message := yesterdayString + "の草:\n"
 	for _, event := range events {
-		message += "リポジトリ: " + event.GetRepo().GetName()
+		message += "\nリポジトリ: " + event.GetRepo().GetName()
 	}
 	return message
 }
