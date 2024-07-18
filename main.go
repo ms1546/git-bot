@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/go-github/v33/github"
@@ -53,9 +54,17 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	yesterdayString := yesterday.Format("2006-01-02")
 	message := yesterdayString + "の草:\n"
+
+	repoEventCount := make(map[string]int)
 	for _, event := range events {
-		message += "\nリポジトリ: " + event.GetRepo().GetName()
+		repoName := event.GetRepo().GetName()
+		repoEventCount[repoName]++
 	}
+
+	for repo, count := range repoEventCount {
+		message += "\nリポジトリ: " + repo + " (" + strconv.Itoa(count) + "件)"
+	}
+
 	return message
 }
 
