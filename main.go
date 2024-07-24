@@ -45,15 +45,17 @@ func getGithubEvents(ctx context.Context, client *github.Client, username, date 
 }
 
 func buildMessage(events []*github.Event, isFinalCheck bool) string {
+	today := time.Now()
+	todayString := today.Format("2006-01-02")
 	if len(events) == 0 {
 		if isFinalCheck {
-			return "本日はGitHubに草が生えませんでした。"
+			return todayString + "の草が生えませんでした"
 		}
-		return "まだ本日はGitHubに草が生えていません。"
+		return todayString + "の草が生えていません"
 	}
 	yesterday := time.Now().AddDate(0, 0, -1)
 	yesterdayString := yesterday.Format("2006-01-02")
-	message := yesterdayString + "の草:\n"
+	message := yesterdayString + "の草www:\n"
 
 	uniqueEvents := make(map[string]bool)
 	for _, event := range events {
