@@ -53,9 +53,7 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 		}
 		return todayString + "の草が生えていません"
 	}
-	yesterday := time.Now().AddDate(0, 0, -1)
-	yesterdayString := yesterday.Format("2006-01-02")
-	message := yesterdayString + "の草www:\n"
+	message := todayString + "の草www:\n"
 
 	uniqueEvents := make(map[string]bool)
 	for _, event := range events {
