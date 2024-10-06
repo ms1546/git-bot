@@ -72,7 +72,7 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 func sendLineMessage(bot *linebot.Client, userID, message string) error {
 	textMessage := linebot.NewTextMessage(message)
 
-	stickerMessage := linebot.NewStickerMessage("11537", "52002735") // 例: LINEの人気スタンプを指定
+	stickerMessage := linebot.NewStickerMessage("11537", "52002735")
 
 	_, err := bot.PushMessage(userID, textMessage, stickerMessage).Do()
 	return err
