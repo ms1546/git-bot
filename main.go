@@ -70,7 +70,11 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 }
 
 func sendLineMessage(bot *linebot.Client, userID, message string) error {
-	_, err := bot.PushMessage(userID, linebot.NewTextMessage(message)).Do()
+	textMessage := linebot.NewTextMessage(message)
+
+	stickerMessage := linebot.NewStickerMessage("11537", "52002735")
+
+	_, err := bot.PushMessage(userID, textMessage, stickerMessage).Do()
 	return err
 }
 
