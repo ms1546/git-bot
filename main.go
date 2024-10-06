@@ -97,7 +97,7 @@ func main() {
 
 	today := time.Now()
 	if isFinalCheck {
-		today = today.AddDate(0, 0, -1)
+		today = today.AddDate(0, 0, 0)
 	}
 	dateString := today.Format("2006-01-02")
 
