@@ -71,11 +71,17 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 
 func sendLineMessage(bot *linebot.Client, userID, message string) error {
 	textMessage := linebot.NewTextMessage(message)
-
 	stickerMessage := linebot.NewStickerMessage("11537", "52002735")
 
 	_, err := bot.PushMessage(userID, textMessage, stickerMessage).Do()
 	return err
+}
+
+func sendErrorMessage(bot *linebot.Client, userID, errMsg string) {
+	textMessage := linebot.NewTextMessage("エラーが発生しました: " + errMsg)
+	if _, err := bot.PushMessage(userID, textMessage).Do(); err != nil {
+		log.Printf("エラーメッセージ送信中にさらにエラーが発生しました: %v", err)
+	}
 }
 
 func main() {
@@ -92,7 +98,9 @@ func main() {
 
 	bot, err := createLineBotClient(lineChannelSecret, lineChannelToken)
 	if err != nil {
-		log.Fatalf("LINEボットクライアントの作成中にエラーが発生しました: %v", err)
+		log.Printf("LINEボットクライアントの作成中にエラーが発生しました: %v", err)
+		sendErrorMessage(bot, lineUserID, err.Error())
+		return
 	}
 
 	today := time.Now()
@@ -103,12 +111,15 @@ func main() {
 
 	events, err := getGithubEvents(ctx, client, githubUsername, dateString)
 	if err != nil {
-		log.Fatalf("イベントの取得中にエラーが発生しました: %v", err)
+		log.Printf("イベントの取得中にエラーが発生しました: %v", err)
+		sendErrorMessage(bot, lineUserID, err.Error())
+		return
 	}
 
 	message := buildMessage(events, isFinalCheck)
 
 	if err := sendLineMessage(bot, lineUserID, message); err != nil {
-		log.Fatalf("LINEへのメッセージ送信中にエラーが発生しました: %v", err)
+		log.Printf("LINEへのメッセージ送信中にエラーが発生しました: %v", err)
+		sendErrorMessage(bot, lineUserID, err.Error())
 	}
 }
