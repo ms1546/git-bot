@@ -69,11 +69,16 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 	return message
 }
 
-func sendLineMessage(bot *linebot.Client, userID, message string) error {
+func sendLineMessage(bot *linebot.Client, userID, message string, hasEvents bool) error {
 	textMessage := linebot.NewTextMessage(message)
-	stickerMessage := linebot.NewStickerMessage("11537", "52002735")
 
-	_, err := bot.PushMessage(userID, textMessage, stickerMessage).Do()
+	if hasEvents {
+		stickerMessage := linebot.NewStickerMessage("11537", "52002735")
+		_, err := bot.PushMessage(userID, textMessage, stickerMessage).Do()
+		return err
+	}
+
+	_, err := bot.PushMessage(userID, textMessage).Do()
 	return err
 }
 
@@ -117,8 +122,9 @@ func main() {
 	}
 
 	message := buildMessage(events, isFinalCheck)
+	hasEvents := len(events) > 0
 
-	if err := sendLineMessage(bot, lineUserID, message); err != nil {
+	if err := sendLineMessage(bot, lineUserID, message, hasEvents); err != nil {
 		log.Printf("LINEへのメッセージ送信中にエラーが発生しました: %v", err)
 		sendErrorMessage(bot, lineUserID, err.Error())
 	}
