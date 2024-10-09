@@ -24,14 +24,16 @@ func createLineBotClient(secret, token string) (*linebot.Client, error) {
 func getGithubEvents(ctx context.Context, client *github.Client, username, date string) ([]*github.Event, error) {
 	opts := &github.ListOptions{}
 	var allEvents []*github.Event
-
-	for {
+	retryCount := 3
+	for retry := 0; retry < retryCount; retry++ {
 		events, resp, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, opts)
 		if err != nil {
-			return nil, err
+			log.Printf("リクエストが失敗しました。リトライします (%d/%d): %v", retry+1, retryCount, err)
+			time.Sleep(2 * time.Second)
+			continue
 		}
 		for _, event := range events {
-			eventDate := event.GetCreatedAt().Format("2006-01-02")
+			eventDate := event.GetCreatedAt().In(time.Local).Format("2006-01-02")
 			if eventDate == date {
 				allEvents = append(allEvents, event)
 			}
@@ -41,6 +43,11 @@ func getGithubEvents(ctx context.Context, client *github.Client, username, date 
 		}
 		opts.Page = resp.NextPage
 	}
+
+	if len(allEvents) == 0 {
+		return nil, nil
+	}
+
 	return allEvents, nil
 }
 
@@ -110,7 +117,7 @@ func main() {
 
 	today := time.Now()
 	if isFinalCheck {
-		today = today.AddDate(0, 0, 0)
+		today = today.AddDate(0, 0, -1)
 	}
 	dateString := today.Format("2006-01-02")
 
