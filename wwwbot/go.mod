@@ -1,6 +1,6 @@
-module www-bot
+module wwwbot
 
-go 1.21
+go 1.22
 
 require (
 	github.com/google/go-github/v33 v33.0.0
