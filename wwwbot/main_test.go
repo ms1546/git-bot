@@ -15,11 +15,6 @@ type MockGitHubClient struct {
 	mock.Mock
 }
 
-func (m *MockGitHubClient) Activity() *github.ActivityService {
-	args := m.Called()
-	return args.Get(0).(*github.ActivityService)
-}
-
 func (m *MockGitHubClient) ListEventsPerformedByUser(ctx context.Context, username string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error) {
 	args := m.Called(ctx, username, publicOnly, opt)
 	return args.Get(0).([]*github.Event), args.Get(1).(*github.Response), args.Error(2)
@@ -29,9 +24,9 @@ type MockLineBotClient struct {
 	mock.Mock
 }
 
-func (m *MockLineBotClient) PushMessage(to string, messages ...linebot.SendingMessage) *linebot.BotResponse {
+func (m *MockLineBotClient) PushMessage(to string, messages ...linebot.SendingMessage) *linebot.BotAPIResponse {
 	args := m.Called(to, messages)
-	return args.Get(0).(*linebot.BotResponse)
+	return &linebot.BotAPIResponse{}, args.Error(1)
 }
 
 func TestGetGithubEvents(t *testing.T) {
@@ -62,9 +57,8 @@ func TestSendLineMessage(t *testing.T) {
 	mockBot := new(MockLineBotClient)
 	userID := "U1234567890"
 	message := "Test message"
-	stickerMessage := linebot.NewStickerMessage("11537", "52002735")
 
-	mockBot.On("PushMessage", userID, mock.Anything).Return(&linebot.BotResponse{})
+	mockBot.On("PushMessage", userID, mock.Anything).Return(&linebot.BotAPIResponse{}, nil)
 
 	err := sendLineMessage(mockBot, userID, message, true)
 	assert.NoError(t, err)
@@ -76,7 +70,7 @@ func TestSendErrorMessage(t *testing.T) {
 	userID := "U1234567890"
 	errMsg := "An error occurred"
 
-	mockBot.On("PushMessage", userID, mock.Anything).Return(&linebot.BotResponse{})
+	mockBot.On("PushMessage", userID, mock.Anything).Return(&linebot.BotAPIResponse{}, nil)
 
 	sendErrorMessage(mockBot, userID, errMsg)
 	mockBot.AssertExpectations(t)
