@@ -17,10 +17,6 @@ jobs:
       LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
       LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
 
-    defaults:
-      run:
-        working-directory: wwwbot
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
