@@ -1,4 +1,4 @@
-module main
+module git_bot
 
 go 1.22
 
