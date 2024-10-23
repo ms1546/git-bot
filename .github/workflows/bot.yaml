@@ -5,6 +5,7 @@ on:
     - cron: '0 12 * * *' # 21:00 JST
     - cron: '0 14 * * *' # 23:00 JST
     - cron: '0 15 * * *' # 00:00 JST
+  workflow_dispatch:
 
 jobs:
   notify:
@@ -28,6 +29,9 @@ jobs:
 
     - name: Install dependencies
       run: go mod tidy
+
+    - name: Run tests
+      run: go test -v ./...
 
     - name: Run notification script at 21:00
       if: github.event.schedule == '0 12 * * *'
