@@ -11,24 +11,52 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func createGithubClient(ctx context.Context, token string) *github.Client {
+type GitHubClient interface {
+	ListEventsPerformedByUser(ctx context.Context, username string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error)
+}
+
+type GitHubClientWrapper struct {
+	client *github.Client
+}
+
+func (w *GitHubClientWrapper) ListEventsPerformedByUser(ctx context.Context, username string, publicOnly bool, opt *github.ListOptions) ([]*github.Event, *github.Response, error) {
+	return w.client.Activity.ListEventsPerformedByUser(ctx, username, publicOnly, opt)
+}
+
+func createGithubClient(ctx context.Context, token string) GitHubClient {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(ctx, ts)
-	return github.NewClient(tc)
+	return &GitHubClientWrapper{client: github.NewClient(tc)}
 }
 
-func createLineBotClient(secret, token string) (*linebot.Client, error) {
-	return linebot.New(secret, token)
+type LineBotClient interface {
+	PushMessage(to string, messages ...linebot.SendingMessage) (*linebot.BasicResponse, error)
 }
 
-func getGithubEvents(ctx context.Context, client *github.Client, username, date string) ([]*github.Event, error) {
+type LineBotClientWrapper struct {
+	client *linebot.Client
+}
+
+func (w *LineBotClientWrapper) PushMessage(to string, messages ...linebot.SendingMessage) (*linebot.BasicResponse, error) {
+	return w.client.PushMessage(to, messages...).Do()
+}
+
+func createLineBotClient(secret, token string) (LineBotClient, error) {
+	client, err := linebot.New(secret, token)
+	if err != nil {
+		return nil, err
+	}
+	return &LineBotClientWrapper{client: client}, nil
+}
+
+func getGithubEvents(ctx context.Context, client GitHubClient, username, date string) ([]*github.Event, error) {
 	opts := &github.ListOptions{}
 	var allEvents []*github.Event
-	retryCount := 3
-	for retry := 0; retry < retryCount; retry++ {
-		events, resp, err := client.Activity.ListEventsPerformedByUser(ctx, username, false, opts)
+
+	for retry := 0; retry < 3; retry++ {
+		events, resp, err := client.ListEventsPerformedByUser(ctx, username, false, opts)
 		if err != nil {
-			log.Printf("リクエストが失敗しました。リトライします (%d/%d): %v", retry+1, retryCount, err)
+			log.Printf("Retrying due to error: %v", err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -47,13 +75,29 @@ func getGithubEvents(ctx context.Context, client *github.Client, username, date 
 	if len(allEvents) == 0 {
 		return nil, nil
 	}
-
 	return allEvents, nil
 }
 
+func sendLineMessage(bot LineBotClient, userID, message string, hasEvents bool) error {
+	textMessage := linebot.NewTextMessage(message)
+	if hasEvents {
+		stickerMessage := linebot.NewStickerMessage("11537", "52002735")
+		_, err := bot.PushMessage(userID, textMessage, stickerMessage)
+		return err
+	}
+	_, err := bot.PushMessage(userID, textMessage)
+	return err
+}
+
+func sendErrorMessage(bot LineBotClient, userID, errMsg string) {
+	textMessage := linebot.NewTextMessage("Error: " + errMsg)
+	if _, err := bot.PushMessage(userID, textMessage); err != nil {
+		log.Printf("Error sending error message: %v", err)
+	}
+}
+
 func buildMessage(events []*github.Event, isFinalCheck bool) string {
-	today := time.Now()
-	todayString := today.Format("2006-01-02")
+	todayString := time.Now().Format("2006-01-02")
 	if len(events) == 0 {
 		if isFinalCheck {
 			return todayString + "の草が生えませんでした"
@@ -61,7 +105,6 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 		return todayString + "の草が生えていません"
 	}
 	message := todayString + "の草www:\n"
-
 	uniqueEvents := make(map[string]bool)
 	for _, event := range events {
 		repoName := event.GetRepo().GetName()
@@ -72,33 +115,11 @@ func buildMessage(events []*github.Event, isFinalCheck bool) string {
 			message += "\nリポジトリ: " + repoName + " (" + eventType + ")"
 		}
 	}
-
 	return message
-}
-
-func sendLineMessage(bot *linebot.Client, userID, message string, hasEvents bool) error {
-	textMessage := linebot.NewTextMessage(message)
-
-	if hasEvents {
-		stickerMessage := linebot.NewStickerMessage("11537", "52002735")
-		_, err := bot.PushMessage(userID, textMessage, stickerMessage).Do()
-		return err
-	}
-
-	_, err := bot.PushMessage(userID, textMessage).Do()
-	return err
-}
-
-func sendErrorMessage(bot *linebot.Client, userID, errMsg string) {
-	textMessage := linebot.NewTextMessage("エラーが発生しました: " + errMsg)
-	if _, err := bot.PushMessage(userID, textMessage).Do(); err != nil {
-		log.Printf("エラーメッセージ送信中にさらにエラーが発生しました: %v", err)
-	}
 }
 
 func main() {
 	ctx := context.Background()
-
 	githubToken := os.Getenv("GH_TOKEN")
 	githubUsername := os.Getenv("GH_USERNAME")
 	lineChannelSecret := os.Getenv("LINE_CHANNEL_SECRET")
@@ -110,7 +131,7 @@ func main() {
 
 	bot, err := createLineBotClient(lineChannelSecret, lineChannelToken)
 	if err != nil {
-		log.Printf("LINEボットクライアントの作成中にエラーが発生しました: %v", err)
+		log.Printf("Error creating LINE bot client: %v", err)
 		sendErrorMessage(bot, lineUserID, err.Error())
 		return
 	}
@@ -123,7 +144,7 @@ func main() {
 
 	events, err := getGithubEvents(ctx, client, githubUsername, dateString)
 	if err != nil {
-		log.Printf("イベントの取得中にエラーが発生しました: %v", err)
+		log.Printf("Error fetching events: %v", err)
 		sendErrorMessage(bot, lineUserID, err.Error())
 		return
 	}
@@ -132,7 +153,7 @@ func main() {
 	hasEvents := len(events) > 0
 
 	if err := sendLineMessage(bot, lineUserID, message, hasEvents); err != nil {
-		log.Printf("LINEへのメッセージ送信中にエラーが発生しました: %v", err)
+		log.Printf("Error sending LINE message: %v", err)
 		sendErrorMessage(bot, lineUserID, err.Error())
 	}
 }
