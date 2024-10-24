@@ -1,4 +1,4 @@
-package git_bot
+package main
 
 import (
 	"context"
